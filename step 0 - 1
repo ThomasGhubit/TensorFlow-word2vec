@@ -1,0 +1,20 @@
+one_content = ""
+
+def PrefixDict(file_name, new_content):
+    fp = open('/home/bigdata/NLP_180712/txt_test/{}'.format(file_name),'r')
+    content = fp.read()
+
+    string_list = re.split('，|？|。|（|）|：|、|\n|；|”|“', content)
+    string = " ".join(string_list)
+    another_string_list = re.split(r'[%&nbsp]+', string)
+    another_string = " ".join(another_string_list)
+    another_string.replace(" ", "")
+
+    jiebacut = jieba.cut(another_string)
+    new_content = " ".join(jiebacut).replace("  ", "").replace("   ", "").replace("    ", "").replace(" . ", " ").replace(" , ", ",")
+    return new_content
+
+# one_content = PrefixDict('corpus.txt', one_content)
+
+# with open('/home/bigdata/NLP_180712/txt/training.txt','w') as text:
+#     text.write(one_content)
