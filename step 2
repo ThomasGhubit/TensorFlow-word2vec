@@ -1,0 +1,40 @@
+# Step 2: Build the dictionary and replace rare words with UNK token.
+# 步骤二：制作一个词表，将单词映射为一个id
+# 词表大小为两千（即只考虑常出现的2千个词） 
+# 将不常见的词变成一个UNK标识符，映射到统一的id
+vocabulary_size = 2000
+
+def build_dataset(words, n_words):
+  """Process raw inputs into a dataset."""
+# 函数功能：将原始单词表变成单词
+  count = [['UNK', -1]]
+  count.extend(collections.Counter(words).most_common(n_words - 1))
+  dictionary = dict()
+  for word, _ in count:
+    dictionary[word] = len(dictionary)
+  data = list()
+  unk_count = 0
+  for word in words:
+    index = dictionary.get(word, 0)
+    if index == 0:  # dictionary['UNK'] UNK index = 0
+      unk_count += 1
+    data.append(index)
+  count[0][1] = unk_count
+  reversed_dictionary = dict(zip(dictionary.values(), dictionary.keys()))
+  return data, count, dictionary, reversed_dictionary
+
+# Filling 4 global variables:
+# data - list of codes (integers from 0 to vocabulary_size-1).
+#   This is the original text but words are replaced by their codes
+# count - map of words(strings) to count of occurrences
+# dictionary - map of words(strings) to their codes(integers)
+# reverse_dictionary - maps codes(integers) to words(strings)
+data, count, dictionary, reverse_dictionary = build_dataset(
+    vocabulary, vocabulary_size)
+del vocabulary  # Hint to reduce memory. 删除已节省内存
+# 输出最长出现5个单词
+print('Most common words (+UNK)', count[:5])
+# 输出转换后的数据库data，和原来的前十个单词
+print('Sample data', data[:10], [reverse_dictionary[i] for i in data[:10]])
+# 下面使用data做训练集
+data_index = 0
