@@ -1,0 +1,85 @@
+# Step 4: Build and train a skip-gram model.
+# 步骤四：建立模型
+batch_size = 128
+embedding_size = 128  # Dimension of the embedding vector.词嵌入空间是128维，即word2vec中一个vex是128维向量
+skip_window = 1  # How many words to consider left and right. skip_window参数和之前保持一致
+num_skips = 2  # How many times to reuse an input to generate a label.num_skips参数和之前保持一致
+num_sampled = 64  # Number of negative examples to sample.
+
+# 在训练过程中，会对模型进行验证
+# 验证方法是找出和某个词最近的词
+# 只对valid_window的词进行验证，因为这些词最常出现
+valid_size = 16  # Random set of words to evaluate similarity on.每次验证16个词
+valid_window = 100  # Only pick dev samples in the head of the distribution.这16个词是从前100个最常见的词中选出来的
+valid_examples = np.random.choice(valid_window, valid_size, replace=False)
+
+graph = tf.Graph()
+
+with graph.as_default():
+
+  # Input data.输入的batch
+  with tf.name_scope('inputs'):
+    train_inputs = tf.placeholder(tf.int32, shape=[batch_size])
+    train_labels = tf.placeholder(tf.int32, shape=[batch_size, 1])
+    # 用于验证的词
+    valid_dataset = tf.constant(word_num, dtype=tf.int32)
+
+  # Ops and variables pinned to the CPU because of missing GPU implementation
+# 下面采用的某些函数还没有GPU实现，所以只在CPU上定义模型
+  with tf.device('/cpu:0'):
+    # Look up embeddings for inputs.
+    with tf.name_scope('embeddings'):
+      # 定义一个embeddings变量，相当于一行存储一个词的embedding
+      embeddings = tf.Variable(
+          tf.random_uniform([vocabulary_size, embedding_size], -1.0, 1.0))
+      # 利用embedding_lookup可以得到一个batch内所有的词嵌入
+      embed = tf.nn.embedding_lookup(embeddings, train_inputs)
+
+    # Construct the variables for the NCE loss 创建两个变量用于NCE Loss（即选取噪声类词的二分类损失）
+    with tf.name_scope('weights'):
+      nce_weights = tf.Variable(
+          tf.truncated_normal(
+              [vocabulary_size, embedding_size],
+              stddev=1.0 / math.sqrt(embedding_size)))
+    with tf.name_scope('biases'):
+      nce_biases = tf.Variable(tf.zeros([vocabulary_size]))
+
+  # Compute the average NCE loss for the batch.
+  # tf.nce_loss automatically draws a new sample of the negative labels each
+  # time we evaluate the loss.
+  # Explanation of the meaning of NCE loss:
+  #   http://mccormickml.com/2016/04/19/word2vec-tutorial-the-skip-gram-model/
+  with tf.name_scope('loss'):
+    loss = tf.reduce_mean( # tf.nn.nce_loss会自动选取噪声词，并且形成损失 随机选取num_sample个噪声词
+        tf.nn.nce_loss(
+            weights=nce_weights,
+            biases=nce_biases,
+            labels=train_labels,
+            inputs=embed,
+            num_sampled=num_sampled,
+            num_classes=vocabulary_size))
+
+  # Add the loss value as a scalar to summary.
+  tf.summary.scalar('loss', loss)
+
+  # Construct the SGD optimizer using a learning rate of 1.0. 得到loss后，可以构造优化器了
+  with tf.name_scope('optimizer'):
+    optimizer = tf.train.GradientDescentOptimizer(1.0).minimize(loss)
+
+  # Compute the cosine similarity between minibatch examples and all embeddings.对embedding层做一次规划
+  norm = tf.sqrt(tf.reduce_sum(tf.square(embeddings), 1, keepdims=True))
+  normalized_embeddings = embeddings / norm
+  # 找出和验证词的embedding并计算他们和所有词的相似度（用于验证）
+  valid_embeddings = tf.nn.embedding_lookup(normalized_embeddings,
+                                            valid_dataset)
+  similarity = tf.matmul(
+      valid_embeddings, normalized_embeddings, transpose_b=True)
+
+  # Merge all summaries.
+  merged = tf.summary.merge_all()
+
+  # Add variable initializer. 变量初始化步骤
+  init = tf.global_variables_initializer()
+
+  # Create a saver.
+  saver = tf.train.Saver()
