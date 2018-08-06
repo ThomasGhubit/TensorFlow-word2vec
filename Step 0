@@ -1,0 +1,84 @@
+# Step 0 doc/docx/pdf(非保护)格式文档转换成txt
+# txt file will be used on grading
+
+# -*- coding: utf-8 -*-
+from pdfminer.pdfinterp import PDFResourceManager, PDFPageInterpreter
+from pdfminer.converter import TextConverter
+from pdfminer.layout import LAParams
+from pdfminer.pdfpage import PDFPage
+import docx
+import os,io
+import subprocess
+import sys, getopt
+
+#converts pdf, returns its text content as a string
+def convert(fname, pages=None):
+    if not pages:
+        pagenums = set()
+    else:
+        pagenums = set(pages)
+
+    output = io.StringIO()
+    manager = PDFResourceManager()
+    converter = TextConverter(manager, output, laparams=LAParams())
+    interpreter = PDFPageInterpreter(manager, converter)
+
+    infile = open(fname, 'rb')
+    print(infile)
+    for page in PDFPage.get_pages(infile, pagenums):
+        interpreter.process_page(page)
+    infile.close()
+    converter.close()
+    text = output.getvalue()
+    output.close
+    return text
+
+# converts all pdfs in directory pdfDir, saves all resulting txt files to txtdir
+def convertMultiple(pdfDir, txtDir):
+    if pdfDir == "": pdfDir = os.getcwd() + "\\" #if no pdfDir passed in 
+    for pdf in os.listdir(pdfDir): #iterate through pdfs in pdf directory
+        fileExtension = pdf.split(".")[-1]
+        if fileExtension == "pdf":
+            pdfFilename = pdfDir + pdf 
+            text = convert(pdfFilename) #get string of text content of pdf
+            textFilename = txtDir + pdf[:-4] + ".txt"
+            textFile = open(textFilename, "w") #make text file
+            textFile.write(text) #write text to text file
+
+# convert all docx, saves all resulting txt files to txtdir
+def getText(filename):
+    doc = docx.Document(filename)
+    fullText = []
+    for para in doc.paragraphs:
+        fullText.append(para.text)
+    return '\n'.join(fullText)
+
+# convert all doc, saves all resulting txt files to txtdir
+def getdoc(filename):
+    doc = subprocess.check_output(['/home/bigdata/bin/antiword',filename])
+    output = doc.decode()
+    return output
+
+if __name__ == '__main__':
+    path = '/home/bigdata/NLP_180712/20180725多个省市20份报告'
+    txtDir = "/home/bigdata/NLP_180712/txt_test/"
+    files = os.listdir(path)
+    for f in files:
+        pdfDir = path + '/'
+        
+        new = path + '/' + f
+        fname = f[-1]
+        if fname == 'c':
+            fileObject = open('/home/bigdata/NLP_180712/txt_test/{}.txt'.format(f[:-4]),'w')
+            print(fileObject)
+            fileObject.write(getdoc(new))
+            print(f[:-4])
+        elif fname == 'x':
+            print(fname)
+            fileObject = open('/home/bigdata/NLP_180712/txt_test/{}.txt'.format(f[:-5]),'w')
+            print(fileObject)
+            fileObject.write(getText(new))
+        elif fname == 'f':
+            convertMultiple(pdfDir, txtDir)
+            print(f[:-3])
+    fileObject.close()
